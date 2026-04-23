@@ -1,40 +1,203 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { UserWarning } from './UserWarning';
-import { getTodos, USER_ID } from './api/todos';
+import { getTodos, addTodo, deleteTodo, USER_ID } from './api/todos';
 
-import {
-  ErrorNotification,
-  ErrorMessages,
-} from './components/ErrorNotification';
+import { ErrorNotification } from './components/ErrorNotification';
 import { Footer, TodoStatus } from './components/Footer';
-import { Header } from './components/Header';
+import { Header, TodoAddOperationStatus } from './components/Header';
 import { Todo } from './types/Todo';
 import { Todo as TodoItem } from './components/Todo';
+import { DefaultErrorMessages, ErrorMessage } from './types/ErrorMessages';
 
 export const App: React.FC = () => {
+  // ! add notification BEFORE every next request.
+
+  // #region todo display state
+
   const [todos, setTodos] = useState<Todo[]>([]);
-  const [filteringByCompleted, setFilteringByCompleted] = useState<TodoStatus>(
+  const [tempTodo, setTempTodo] = useState<Todo | null>(null);
+  const [loadingTodoIdsState, setLoadingTodoIdsState] = useState<number[]>([]);
+  const loadingTodoIdsRef = useRef<Set<number>>(new Set());
+  // The ref is to conquer the Catch-22 in the handleDeleteAllCompleted method:
+  // requiring the freshest loadingTodoIds state synchronously
+  // after calling the updating function.
+  // Although I probably shouldn't have complicated that.
+  const [filteringByCompleted, setFilteringByCompleted] = useState(
     TodoStatus.ALL,
   );
-  const [errorMessage, setErrorMessage] = useState(ErrorMessages.NONE);
+
+  // #endregion
+
+  // #region error state
+
+  const [errorMessage, setErrorMessage] = useState<ErrorMessage>(
+    DefaultErrorMessages.NONE,
+  );
   const [errorRenderIteration, setErrorRenderIteration] = useState(1);
 
-  function displayError(message: ErrorMessages) {
-    setErrorMessage(message);
-    setErrorRenderIteration(current => current + 1);
+  // #endregion
+
+  // #region ...
+
+  const [taskInputFocusTrigger, setTaskInputFocusTrigger] = useState(true);
+  const [todoAddStatus, setTodoAddStatus] = useState(
+    TodoAddOperationStatus.SUCCESS,
+  );
+  const [isDeleteAllCompletedLoading, setIsDeleteAllCompletedLoading] =
+    useState(false);
+
+  // #endregion
+
+  // #region additional state manipulation functions
+
+  const displayError = useCallback(
+    (message: typeof errorMessage) => {
+      setErrorMessage(message);
+      setErrorRenderIteration(current => current + 1);
+    },
+    [setErrorMessage, setErrorRenderIteration],
+  );
+
+  function updateLoadingTodoIdsState() {
+    setLoadingTodoIdsState(Array.from(loadingTodoIdsRef.current));
   }
 
-  // > Fetching
+  function markAsLoading(id: number) {
+    // TODO: Could be split into separate actions to aggregate and not run
+    // TODO:  updateLoadingTodoIdsState on every single id change.
+    loadingTodoIdsRef.current.add(id);
+    updateLoadingTodoIdsState();
+  }
+
+  function unmarkAsLoading(id: number) {
+    loadingTodoIdsRef.current.delete(id);
+    updateLoadingTodoIdsState();
+  }
+
+  function focusInput() {
+    setTaskInputFocusTrigger(current => !current);
+  }
+
+  // #endregion
+
+  // #region todo manipulation functions
+
+  const handleFetchTodos = useCallback(async () => {
+    try {
+      const fetchedTodos = await getTodos();
+
+      setTodos(fetchedTodos);
+    } catch (error) {
+      displayError(DefaultErrorMessages.FAILED_LOAD);
+    }
+  }, [setTodos, displayError]);
+
+  async function handleAddNewTodo(title: string) {
+    setTodoAddStatus(TodoAddOperationStatus.LOADING);
+
+    const trimmed = title.trim();
+
+    if (!trimmed.length) {
+      displayError(DefaultErrorMessages.EMPTY_TITLE);
+      setTodoAddStatus(TodoAddOperationStatus.ERROR);
+
+      return;
+    }
+
+    const todoTemplate = { title: trimmed, userId: USER_ID, completed: false };
+
+    setTempTodo({ ...todoTemplate, id: 0 });
+
+    try {
+      const newTodo = await addTodo(todoTemplate);
+
+      setTodos(current => [...current, newTodo]);
+      setTodoAddStatus(TodoAddOperationStatus.SUCCESS);
+    } catch (error) {
+      displayError(DefaultErrorMessages.FAILED_ADD);
+      setTodoAddStatus(TodoAddOperationStatus.ERROR);
+    } finally {
+      setTempTodo(null);
+      focusInput();
+    }
+  }
+
+  async function handleDeleteTodo(id: number) {
+    markAsLoading(id);
+
+    try {
+      await deleteTodo(id);
+
+      setTodos(current => [...current].filter(todo => todo.id !== id));
+      // ? Is putting the state in ref in Set
+      // ? and .deleting it there more effective?
+    } catch (error) {
+      displayError(DefaultErrorMessages.FAILED_DELETE);
+    } finally {
+      unmarkAsLoading(id);
+      focusInput();
+    }
+  }
+
+  // Optionally: Add an isLoading prop to the todos[] state.
+  //  Or have loadingTodos be an array of the same size as todos[],
+  //  and store the loading state there as boolean
+  async function handleDeleteAllCompleted() {
+    setIsDeleteAllCompletedLoading(true);
+
+    const idsToDeleteInThisOperation: number[] = [];
+
+    for (const todo of todos) {
+      const id = todo.id;
+
+      if (todo.completed && !loadingTodoIdsRef.current.has(id)) {
+        idsToDeleteInThisOperation.push(id);
+        markAsLoading(id);
+      }
+    }
+
+    try {
+      const deletions = await Promise.allSettled(
+        idsToDeleteInThisOperation.map(id => deleteTodo(id)),
+      );
+
+      deletions.forEach((result, index) => {
+        // * could be aggregated too, at least it's not critical.
+        if (result.status === 'fulfilled') {
+          setTodos(current =>
+            [...current].filter(
+              todo => todo.id !== idsToDeleteInThisOperation[index],
+            ),
+          );
+
+          return;
+        }
+
+        if (result.status === 'rejected') {
+          displayError(DefaultErrorMessages.FAILED_DELETE);
+        }
+      });
+    } catch (error) {
+      // * Usually the catch block catches both errors and rejected promises,
+      // *  but with the Promise.allSettled method the rejects go into the
+      // *  .then() chain.
+      // ?  But this should've caught errors! And it doesn't...
+      // eslint-disable-next-line max-len, prettier/prettier
+      displayError('An unexpected error has occurred. Please refresh the page to get the latest updates.');
+    } finally {
+      idsToDeleteInThisOperation.forEach(unmarkAsLoading);
+      setIsDeleteAllCompletedLoading(false);
+      focusInput();
+    }
+  }
+
+  // #endregion
+
+  // #region preparation
 
   useEffect(() => {
-    getTodos()
-      .then(setTodos)
-      .catch(() => {
-        displayError(ErrorMessages.FAILED_LOAD);
-      });
-  }, []);
-
-  // > Filtering
+    handleFetchTodos();
+  }, [handleFetchTodos]);
 
   const filteredTodos = todos.filter(todo => {
     let satisfiesCompleted: boolean;
@@ -54,8 +217,6 @@ export const App: React.FC = () => {
     return satisfiesCompleted;
   });
 
-  // > Counting incomplete
-
   let incompleteTodoQuantity = 0;
 
   todos.forEach(todo => {
@@ -66,7 +227,9 @@ export const App: React.FC = () => {
 
   const hasCompletedTodos = todos.length !== incompleteTodoQuantity;
 
-  // > Returns
+  // #endregion
+
+  // #region returns
 
   if (!USER_ID) {
     return <UserWarning />;
@@ -77,13 +240,14 @@ export const App: React.FC = () => {
       <h1 className="todoapp__title">todos</h1>
 
       <div className="todoapp__content">
-        <Header />
+        <Header
+          isDropdownDisabled={incompleteTodoQuantity !== 0}
+          onSubmit={handleAddNewTodo}
+          todoAddStatus={todoAddStatus}
+          focusTrigger={taskInputFocusTrigger}
+        />
 
-        {/*
-          Why hide this if it doesn't take up any space?
-          Wouldn't it be worse for performance?
-        */}
-        {!!todos.length && (
+        {(!!todos.length || tempTodo) && (
           <section className="todoapp__main" data-cy="TodoList">
             {filteredTodos.map(todo => {
               return (
@@ -91,10 +255,21 @@ export const App: React.FC = () => {
                   key={todo.id}
                   todo={todo}
                   isSelected={false}
-                  isLoading={false}
+                  isLoading={loadingTodoIdsState.includes(todo.id)}
+                  onDeleteTodo={handleDeleteTodo}
                 />
               );
             })}
+
+            {tempTodo && (
+              <TodoItem
+                key="loading"
+                todo={tempTodo}
+                isSelected={false}
+                isLoading={true}
+                onDeleteTodo={() => null}
+              />
+            )}
           </section>
         )}
 
@@ -103,7 +278,10 @@ export const App: React.FC = () => {
             incompleteTodoQuantity={incompleteTodoQuantity}
             onFilterSelect={setFilteringByCompleted}
             activeFiltering={filteringByCompleted}
-            isAnyTodoCompleted={hasCompletedTodos}
+            onDeleteCompleted={handleDeleteAllCompleted}
+            isDeleteCompletedButtonDisabled={
+              !hasCompletedTodos || isDeleteAllCompletedLoading
+            }
           />
         )}
       </div>
@@ -114,4 +292,6 @@ export const App: React.FC = () => {
       />
     </div>
   );
+
+  // #endregion
 };

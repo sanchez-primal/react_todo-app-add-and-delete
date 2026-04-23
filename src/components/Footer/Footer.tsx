@@ -8,16 +8,18 @@ export enum TodoStatus {
 
 type Props = {
   incompleteTodoQuantity: number;
-  isAnyTodoCompleted: boolean;
   onFilterSelect: (filterType: TodoStatus) => void;
   activeFiltering: TodoStatus;
+  onDeleteCompleted: () => void;
+  isDeleteCompletedButtonDisabled: boolean;
 };
 
 export const Footer: React.FC<Props> = ({
   incompleteTodoQuantity,
-  isAnyTodoCompleted,
   onFilterSelect,
   activeFiltering,
+  onDeleteCompleted,
+  isDeleteCompletedButtonDisabled,
 }) => {
   return (
     <footer className="todoapp__footer" data-cy="Footer">
@@ -60,15 +62,15 @@ export const Footer: React.FC<Props> = ({
         </a>
       </nav>
 
-      {isAnyTodoCompleted && (
-        <button
-          type="button"
-          className="todoapp__clear-completed"
-          data-cy="ClearCompletedButton"
-        >
-          Clear completed
-        </button>
-      )}
+      <button
+        type="button"
+        className="todoapp__clear-completed"
+        data-cy="ClearCompletedButton"
+        onClick={onDeleteCompleted}
+        disabled={isDeleteCompletedButtonDisabled}
+      >
+        Clear completed
+      </button>
     </footer>
   );
 };
