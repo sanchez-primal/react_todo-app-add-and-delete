@@ -11,7 +11,7 @@ import { DefaultErrorMessages, ErrorMessage } from './types/ErrorMessages';
 import { createUnexpectedErrorMessage } from './utils/errorMessages';
 
 export const App: React.FC = () => {
-  // ! add notification BEFORE every next request.
+  // TODO? hide the notification BEFORE every next request.
 
   // #region todo display state
 
@@ -20,9 +20,8 @@ export const App: React.FC = () => {
   const [loadingTodoIdsState, setLoadingTodoIdsState] = useState<number[]>([]);
   const loadingTodoIdsRef = useRef<Set<number>>(new Set());
   // The ref is to conquer the Catch-22 in the handleDeleteAllCompleted method:
-  // requiring the freshest loadingTodoIds state synchronously
-  // after calling the updating function.
-  // Although I probably shouldn't have complicated that.
+  //  requiring the freshest loadingTodoIds state synchronously
+  //  after calling the updating function.
   const [filteringByCompleted, setFilteringByCompleted] = useState(
     TodoStatus.All,
   );
@@ -38,14 +37,14 @@ export const App: React.FC = () => {
 
   // #endregion
 
-  // #region ...
+  // #region todo manipulation meta state etc
 
-  const [taskInputFocusTrigger, setTaskInputFocusTrigger] = useState(true);
-  const [todoAddStatus, setTodoAddStatus] = useState(
+  const [processingDeleteCompleted, setProcessingDeleteCompleted] =
+    useState(false);
+  const [todoAddOperationStatus, setTodoAddOperationStatus] = useState(
     TodoAddOperationStatus.SUCCESS,
   );
-  const [isDeleteAllCompletedLoading, setIsDeleteAllCompletedLoading] =
-    useState(false);
+  const [taskInputFocusTrigger, setTaskInputFocusTrigger] = useState(true);
 
   // #endregion
 
@@ -64,8 +63,8 @@ export const App: React.FC = () => {
   }
 
   function markAsLoading(id: number) {
-    // TODO: Could be split into separate actions to aggregate and not run
-    // TODO:  updateLoadingTodoIdsState on every single id change.
+    // TODO*: Could be split into separate actions to aggregate and not run
+    // TODO*:  updateLoadingTodoIdsState on every single id change.
     loadingTodoIdsRef.current.add(id);
     updateLoadingTodoIdsState();
   }
@@ -94,29 +93,29 @@ export const App: React.FC = () => {
   }, [setTodos, displayError]);
 
   async function handleAddNewTodo(title: string) {
-    setTodoAddStatus(TodoAddOperationStatus.LOADING);
+    setTodoAddOperationStatus(TodoAddOperationStatus.LOADING);
 
     const trimmed = title.trim();
 
     if (!trimmed.length) {
       displayError(DefaultErrorMessages.EMPTY_TITLE);
-      setTodoAddStatus(TodoAddOperationStatus.ERROR);
+      setTodoAddOperationStatus(TodoAddOperationStatus.ERROR);
 
       return;
     }
 
-    const todoTemplate = { title: trimmed, userId: USER_ID, completed: false };
+    const todoData = { title: trimmed, userId: USER_ID, completed: false };
 
-    setTempTodo({ ...todoTemplate, id: 0 });
+    setTempTodo({ ...todoData, id: 0 });
 
     try {
-      const newTodo = await addTodo(todoTemplate);
+      const newTodo = await addTodo(todoData);
 
       setTodos(current => [...current, newTodo]);
-      setTodoAddStatus(TodoAddOperationStatus.SUCCESS);
+      setTodoAddOperationStatus(TodoAddOperationStatus.SUCCESS);
     } catch (error) {
       displayError(DefaultErrorMessages.FAILED_ADD);
-      setTodoAddStatus(TodoAddOperationStatus.ERROR);
+      setTodoAddOperationStatus(TodoAddOperationStatus.ERROR);
     } finally {
       setTempTodo(null);
       focusInput();
@@ -140,11 +139,11 @@ export const App: React.FC = () => {
     }
   }
 
-  // Optionally: Add an isLoading prop to the todos[] state.
-  //  Or have loadingTodos be an array of the same size as todos[],
-  //  and store the loading state there as boolean
   async function handleDeleteAllCompleted() {
-    setIsDeleteAllCompletedLoading(true);
+    // Optionally: Add an isLoading prop to the todos[] state.
+    //  Or have loadingTodos be an array of the same size as todos[],
+    //  and store the loading state there as boolean
+    setProcessingDeleteCompleted(true);
 
     const idsToDeleteInThisOperation: number[] = [];
 
@@ -163,7 +162,7 @@ export const App: React.FC = () => {
       );
 
       deletions.forEach((result, index) => {
-        // * could be aggregated too, at least it's not critical.
+        // TODO*: Could be aggregated too.
         if (result.status === 'fulfilled') {
           setTodos(current =>
             [...current].filter(
@@ -179,18 +178,18 @@ export const App: React.FC = () => {
         }
       });
     } catch (error) {
-      // * Usually the catch block catches both errors and rejected promises,
-      // *  but with the Promise.allSettled method the rejects go into the
-      // *  .then() chain.
-      // ?  But this should've caught errors! And it doesn't...
+      // ? Why doesn't it catch errors?
+      // ? What if I reject with an error? Is it serializable?
+      // ? What if I throw an error that will reject? First of all: how?
+      // ?  And then: would it be possible to catch it?
       displayError(
         createUnexpectedErrorMessage(
-          'Please refresh the page to get the latest updates.',
+          'The developer has little to no idea how you got here.',
         ),
       );
     } finally {
       idsToDeleteInThisOperation.forEach(unmarkAsLoading);
-      setIsDeleteAllCompletedLoading(false);
+      setProcessingDeleteCompleted(false);
       focusInput();
     }
   }
@@ -247,7 +246,7 @@ export const App: React.FC = () => {
         <Header
           isDropdownDisabled={incompleteTodoQuantity !== 0}
           onSubmit={handleAddNewTodo}
-          todoAddStatus={todoAddStatus}
+          todoAddStatus={todoAddOperationStatus}
           focusTrigger={taskInputFocusTrigger}
         />
 
@@ -284,7 +283,7 @@ export const App: React.FC = () => {
             activeFiltering={filteringByCompleted}
             onDeleteCompleted={handleDeleteAllCompleted}
             isDeleteCompletedButtonDisabled={
-              !hasCompletedTodos || isDeleteAllCompletedLoading
+              !hasCompletedTodos || processingDeleteCompleted
             }
           />
         )}

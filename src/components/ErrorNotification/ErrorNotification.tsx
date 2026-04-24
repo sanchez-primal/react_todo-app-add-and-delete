@@ -18,12 +18,12 @@ export const ErrorNotification: React.FC<Props> = ({ errorMessage }) => {
 
     setIsHidden(false);
 
-    const timer = setTimeout(() => {
+    const displayTimer = setTimeout(() => {
       setIsHidden(true);
     }, DISPLAY_TIME);
 
     return () => {
-      clearTimeout(timer);
+      clearTimeout(displayTimer);
     };
   }, [errorMessage]);
 
