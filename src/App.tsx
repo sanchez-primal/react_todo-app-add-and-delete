@@ -24,7 +24,7 @@ export const App: React.FC = () => {
   // after calling the updating function.
   // Although I probably shouldn't have complicated that.
   const [filteringByCompleted, setFilteringByCompleted] = useState(
-    TodoStatus.ALL,
+    TodoStatus.All,
   );
 
   // #endregion
@@ -207,10 +207,10 @@ export const App: React.FC = () => {
     let satisfiesCompleted: boolean;
 
     switch (filteringByCompleted) {
-      case TodoStatus.ACTIVE:
+      case TodoStatus.Active:
         satisfiesCompleted = !todo.completed;
         break;
-      case TodoStatus.COMPLETED:
+      case TodoStatus.Completed:
         satisfiesCompleted = todo.completed;
         break;
       default:

@@ -1,9 +1,9 @@
 import classNames from 'classnames';
 
 export enum TodoStatus {
-  ALL = 'All',
-  ACTIVE = 'Active',
-  COMPLETED = 'Completed',
+  All = 'All',
+  Active = 'Active',
+  Completed = 'Completed',
 }
 
 type Props = {
@@ -28,38 +28,23 @@ export const Footer: React.FC<Props> = ({
       </span>
 
       <nav className="filter" data-cy="Filter">
-        <a
-          href="#/"
-          data-cy="FilterLinkAll"
-          onClick={() => onFilterSelect(TodoStatus.ALL)}
-          className={classNames('filter__link', {
-            selected: activeFiltering === TodoStatus.ALL,
-          })}
-        >
-          All
-        </a>
-
-        <a
-          href="#/active"
-          data-cy="FilterLinkActive"
-          onClick={() => onFilterSelect(TodoStatus.ACTIVE)}
-          className={classNames('filter__link', {
-            selected: activeFiltering === TodoStatus.ACTIVE,
-          })}
-        >
-          Active
-        </a>
-
-        <a
-          href="#/completed"
-          data-cy="FilterLinkCompleted"
-          onClick={() => onFilterSelect(TodoStatus.COMPLETED)}
-          className={classNames('filter__link', {
-            selected: activeFiltering === TodoStatus.COMPLETED,
-          })}
-        >
-          Completed
-        </a>
+        {/*
+          I don't like this, and with Object.keys
+          the TodoStatus[status] doesn't work that easy.
+        */}
+        {Object.values(TodoStatus).map(status => (
+          <a
+            key={status}
+            href={`#/${status === TodoStatus.All ? '' : status}`}
+            data-cy={`FilterLink${status}`}
+            onClick={() => onFilterSelect(status)}
+            className={classNames('filter__link', {
+              selected: activeFiltering === status,
+            })}
+          >
+            {status}
+          </a>
+        ))}
       </nav>
 
       <button
