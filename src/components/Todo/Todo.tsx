@@ -6,6 +6,7 @@ type Props = {
   isSelected: boolean;
   isLoading: boolean;
   onDeleteTodo: (id: number) => void;
+  onToggleCompleted: (id: number) => void;
 };
 
 export const Todo: React.FC<Props> = ({
@@ -13,8 +14,13 @@ export const Todo: React.FC<Props> = ({
   isSelected,
   isLoading,
   onDeleteTodo,
+  onToggleCompleted,
 }) => {
   const { id, completed, title } = todo;
+
+  function handleToggleCompleted() {
+    onToggleCompleted(id);
+  }
 
   return (
     <div
@@ -29,7 +35,8 @@ export const Todo: React.FC<Props> = ({
           data-cy="TodoStatus"
           type="checkbox"
           className="todo__status"
-          checked={completed}
+          defaultChecked={completed}
+          onClick={handleToggleCompleted}
         />
       </label>
 

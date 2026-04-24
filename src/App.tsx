@@ -232,6 +232,26 @@ export const App: React.FC = () => {
 
   // #endregion
 
+  // #region special for mentor's convenience
+
+  function temporaryHandleToggleTodoStatus(id: number) {
+    setTodos(current => {
+      const targetIndex = current.findIndex(todo => todo.id === id);
+
+      if (targetIndex === -1) {
+        return [...current];
+      }
+
+      const target = current[targetIndex];
+
+      target.completed = !target.completed;
+
+      return current.toSpliced(targetIndex, 1, { ...target });
+    });
+  }
+
+  // #endregion
+
   // #region returns
 
   if (!USER_ID) {
@@ -261,6 +281,7 @@ export const App: React.FC = () => {
                   isSelected={false}
                   isLoading={loadingTodoIdsState.includes(todo.id)}
                   onDeleteTodo={handleDeleteTodo}
+                  onToggleCompleted={temporaryHandleToggleTodoStatus}
                 />
               );
             })}
@@ -272,6 +293,7 @@ export const App: React.FC = () => {
                 isSelected={false}
                 isLoading={true}
                 onDeleteTodo={() => null}
+                onToggleCompleted={() => null}
               />
             )}
           </section>
