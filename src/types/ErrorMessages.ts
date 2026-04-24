@@ -7,9 +7,10 @@ export enum DefaultErrorMessages {
   FAILED_UPDATE = 'Unable to update a todo',
 }
 
+export const UNEXPECTED_ERROR_PREFIX =
+  'An unexpected error has occurred.' as const;
+
 export type UnexpectedErrorMessage =
-  `An unexpected error has occurred. ${string}`;
-// could also make a helper, but it's a wee bit too much for this project.
-// although it doesn't allow string concatenation and etc in this form...
+  `${typeof UNEXPECTED_ERROR_PREFIX}${string}`;
 
 export type ErrorMessage = DefaultErrorMessages | UnexpectedErrorMessage;

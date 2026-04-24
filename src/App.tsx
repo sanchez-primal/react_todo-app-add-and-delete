@@ -8,6 +8,7 @@ import { Header, TodoAddOperationStatus } from './components/Header';
 import { Todo } from './types/Todo';
 import { Todo as TodoItem } from './components/Todo';
 import { DefaultErrorMessages, ErrorMessage } from './types/ErrorMessages';
+import { createUnexpectedErrorMessage } from './utils/errorMessages';
 
 export const App: React.FC = () => {
   // ! add notification BEFORE every next request.
@@ -182,8 +183,11 @@ export const App: React.FC = () => {
       // *  but with the Promise.allSettled method the rejects go into the
       // *  .then() chain.
       // ?  But this should've caught errors! And it doesn't...
-      // eslint-disable-next-line max-len, prettier/prettier
-      displayError('An unexpected error has occurred. Please refresh the page to get the latest updates.');
+      displayError(
+        createUnexpectedErrorMessage(
+          'Please refresh the page to get the latest updates.',
+        ),
+      );
     } finally {
       idsToDeleteInThisOperation.forEach(unmarkAsLoading);
       setIsDeleteAllCompletedLoading(false);
