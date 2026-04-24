@@ -2,7 +2,8 @@ import classNames from 'classnames';
 import { useEffect, useRef } from 'react';
 
 type Props = {
-  isDropdownDisabled: boolean;
+  isRefreshCompletedVisible: boolean;
+  isRefreshCompletedEnabled: boolean;
   onSubmit: (title: string) => void;
   todoAddStatus?: TodoAddOperationStatus;
   focusTrigger: boolean;
@@ -15,7 +16,8 @@ export enum TodoAddOperationStatus {
 }
 
 export const Header: React.FC<Props> = ({
-  isDropdownDisabled,
+  isRefreshCompletedVisible,
+  isRefreshCompletedEnabled,
   onSubmit,
   todoAddStatus = TodoAddOperationStatus.SUCCESS,
   focusTrigger,
@@ -44,13 +46,15 @@ export const Header: React.FC<Props> = ({
 
   return (
     <header className="todoapp__header">
-      <button
-        type="button"
-        className={classNames('todoapp__toggle-all', {
-          active: isDropdownDisabled,
-        })}
-        data-cy="ToggleAllButton"
-      />
+      {isRefreshCompletedVisible && (
+        <button
+          type="button"
+          className={classNames('todoapp__toggle-all', {
+            active: isRefreshCompletedEnabled,
+          })}
+          data-cy="ToggleAllButton"
+        />
+      )}
 
       <form onSubmit={handleSubmit}>
         <input

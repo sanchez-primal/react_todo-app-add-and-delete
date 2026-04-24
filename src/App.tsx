@@ -244,7 +244,8 @@ export const App: React.FC = () => {
 
       <div className="todoapp__content">
         <Header
-          isDropdownDisabled={incompleteTodoQuantity !== 0}
+          isRefreshCompletedVisible={todos.length !== 0}
+          isRefreshCompletedEnabled={incompleteTodoQuantity === 0}
           onSubmit={handleAddNewTodo}
           todoAddStatus={todoAddOperationStatus}
           focusTrigger={taskInputFocusTrigger}
